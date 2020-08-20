@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct Mbuf {
     b: Box<[u8]>,
     len: usize,
