@@ -1,5 +1,7 @@
+mod arp;
 mod errors;
 mod ethernet;
+mod ipv4;
 mod mbuf;
 
 use errors::NetError;
@@ -16,7 +18,7 @@ fn main() -> Result<(), NetError<'static>> {
 
         mbuf.set_len(n);
 
-        if let Err(err) = ethernet_rx(mbuf) {
+        if let Err(err) = ethernet_rx(&mut mbuf) {
             println!("{}", err);
         }
     }

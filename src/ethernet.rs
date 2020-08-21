@@ -2,10 +2,11 @@ use std::fmt;
 
 use byteorder::{ByteOrder, NetworkEndian};
 
+use crate::arp::arp_rx;
 use crate::errors::NetError;
 use crate::mbuf::Mbuf;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct MacAddress([u8; 6]);
 
 impl MacAddress {
@@ -30,7 +31,7 @@ impl fmt::Display for MacAddress {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum EthernetType {
     Ipv4 = 0x0800,
     Ipv6 = 0x86DD,
@@ -57,15 +58,15 @@ impl EthernetType {
 
 #[derive(Debug)]
 pub struct EthernetHeader {
-    src: MacAddress,
-    dest: MacAddress,
-    ethernet_type: EthernetType,
+    src: MacAddress,             // Source MAC address
+    dest: MacAddress,            // Destination MAC address
+    ethernet_type: EthernetType, // Ethernet type
 }
 
 impl EthernetHeader {
     const LENGTH: usize = 14;
 
-    pub fn pull(mut mbuf: Mbuf) -> Result<Self, NetError<'static>> {
+    pub fn pull(mbuf: &mut Mbuf) -> Result<Self, NetError<'static>> {
         let buf = mbuf
             .pull(EthernetHeader::LENGTH)
             .ok_or_else(|| NetError::ParseError("Invalid ethernet header"))?;
@@ -89,11 +90,15 @@ impl EthernetHeader {
 
 impl fmt::Display for EthernetHeader {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} - {} - {:?}", self.src, self.dest, self.ethernet_type)
+        write!(
+            f,
+            "src: {} - dest: {} - pro: {:?}",
+            self.src, self.dest, self.ethernet_type
+        )
     }
 }
 
-pub fn ethernet_rx(mbuf: Mbuf) -> Result<(), NetError<'static>> {
+pub fn ethernet_rx(mbuf: &mut Mbuf) -> Result<(), NetError<'static>> {
     let ethernet_header = EthernetHeader::pull(mbuf)?;
 
     // DEBUG
@@ -107,10 +112,10 @@ pub fn ethernet_rx(mbuf: Mbuf) -> Result<(), NetError<'static>> {
             return Err(NetError::UnsupportedError("Ipv6 not implemented"));
         }
         EthernetType::Arp => {
-            return Err(NetError::UnsupportedError("Arp not implemented"));
+            return arp_rx(mbuf);
         }
         EthernetType::Unsupported => {
-            return Err(NetError::UnsupportedError("Unsupported protocolt"));
+            return Err(NetError::UnsupportedError("Unsupported protocol"));
         }
     }
 }
