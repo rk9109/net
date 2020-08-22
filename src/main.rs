@@ -12,7 +12,7 @@ use ipv4::Ipv4Address;
 
 fn main() -> Result<(), NetError<'static>> {
     // DEBUG
-    let mac_address = MacAddress::from_slice(&[0xAB, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB]);
+    let mac_address = MacAddress::from_slice(&[0x32, 0x32, 0x60, 0xAB, 0x2F, 0x01]);
     let ipv4_address = Ipv4Address::from_slice(&[10, 0, 0, 2]);
 
     let interface = NetworkInterface::new(mac_address, ipv4_address);
