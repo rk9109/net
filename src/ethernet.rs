@@ -4,20 +4,23 @@ use byteorder::{ByteOrder, NetworkEndian};
 
 use crate::arp::arp_rx;
 use crate::errors::NetError;
+use crate::interface::NetworkInterface;
 use crate::mbuf::Mbuf;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub struct MacAddress([u8; 6]);
 
 impl MacAddress {
+    pub const LENGTH: usize = 6;
+
     pub fn from_slice(slice: &[u8]) -> Self {
-        let mut arr = [0u8; 6];
-        arr.copy_from_slice(&slice[..6]);
-        MacAddress(arr)
+        let mut buf = [0u8; 6];
+        buf.copy_from_slice(&slice[..6]);
+        MacAddress(buf)
     }
 
-    pub fn to_slice(&self) -> &[u8] {
-        todo!();
+    pub fn to_slice(&self, slice: &mut [u8]) {
+        slice.copy_from_slice(&self.0);
     }
 }
 
@@ -33,10 +36,10 @@ impl fmt::Display for MacAddress {
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum EthernetType {
-    Ipv4 = 0x0800,
-    Ipv6 = 0x86DD,
-    Arp = 0x0806,
-    Unsupported,
+    Ipv4,
+    Ipv6,
+    Arp,
+    Unsupported(u16),
 }
 
 impl EthernetType {
@@ -47,12 +50,19 @@ impl EthernetType {
             0x0800 => EthernetType::Ipv4,
             0x86DD => EthernetType::Ipv6,
             0x0806 => EthernetType::Arp,
-            _ => EthernetType::Unsupported,
+            _ => EthernetType::Unsupported(ethernet_type),
         }
     }
 
-    pub fn to_slice(&self) -> &[u8] {
-        todo!();
+    pub fn to_slice(&self, slice: &mut [u8]) {
+        match self {
+            EthernetType::Ipv4 => NetworkEndian::write_u16(slice, 0x0800),
+            EthernetType::Ipv6 => NetworkEndian::write_u16(slice, 0x86DD),
+            EthernetType::Arp => NetworkEndian::write_u16(slice, 0x0806),
+            EthernetType::Unsupported(ethernet_type) => {
+                NetworkEndian::write_u16(slice, *ethernet_type)
+            }
+        }
     }
 }
 
@@ -64,7 +74,7 @@ pub struct EthernetHeader {
 }
 
 impl EthernetHeader {
-    const LENGTH: usize = 14;
+    pub const LENGTH: usize = 14;
 
     pub fn pull(mbuf: &mut Mbuf) -> Result<Self, NetError<'static>> {
         let buf = mbuf
@@ -79,12 +89,20 @@ impl EthernetHeader {
     }
 
     pub fn push(
-        mut mbuf: Mbuf,
+        mbuf: &mut Mbuf,
         src: MacAddress,
         dest: MacAddress,
         ethernet_type: EthernetType,
     ) -> Result<(), NetError<'static>> {
-        todo!();
+        let buf = mbuf
+            .push(EthernetHeader::LENGTH)
+            .ok_or_else(|| NetError::ParseError("Invalid ethernet header"))?;
+
+        src.to_slice(&mut buf[..6]);
+        dest.to_slice(&mut buf[6..12]);
+        ethernet_type.to_slice(&mut buf[12..14]);
+
+        Ok(())
     }
 }
 
@@ -98,7 +116,19 @@ impl fmt::Display for EthernetHeader {
     }
 }
 
-pub fn ethernet_rx(mbuf: &mut Mbuf) -> Result<(), NetError<'static>> {
+pub fn ethernet_tx(
+    interface: &NetworkInterface,
+    mbuf: &mut Mbuf,
+    src: MacAddress,
+    dest: MacAddress,
+    ethernet_type: EthernetType,
+) -> Result<(), NetError<'static>> {
+    EthernetHeader::push(mbuf, src, dest, ethernet_type)?;
+
+    interface.send(mbuf)
+}
+
+pub fn ethernet_rx(interface: &NetworkInterface, mbuf: &mut Mbuf) -> Result<(), NetError<'static>> {
     let ethernet_header = EthernetHeader::pull(mbuf)?;
 
     // DEBUG
@@ -112,9 +142,9 @@ pub fn ethernet_rx(mbuf: &mut Mbuf) -> Result<(), NetError<'static>> {
             return Err(NetError::UnsupportedError("Ipv6 not implemented"));
         }
         EthernetType::Arp => {
-            return arp_rx(mbuf);
+            return arp_rx(interface, mbuf);
         }
-        EthernetType::Unsupported => {
+        EthernetType::Unsupported(_) => {
             return Err(NetError::UnsupportedError("Unsupported protocol"));
         }
     }

@@ -6,7 +6,8 @@ pub struct Mbuf {
 }
 
 impl Mbuf {
-    const SIZE: usize = 1500;
+    // Minimum transmission unit (MTU)
+    const SIZE: usize = 1538;
 
     pub fn new() -> Self {
         Mbuf {
@@ -17,7 +18,7 @@ impl Mbuf {
     }
 
     pub fn get_mut_ref(&mut self) -> &mut [u8] {
-        &mut self.b
+        &mut self.b[self.offset..(self.offset + self.len)]
     }
 
     pub fn set_len(&mut self, len: usize) {

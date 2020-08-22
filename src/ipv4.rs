@@ -1,17 +1,19 @@
 use std::fmt;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub struct Ipv4Address([u8; 4]);
 
 impl Ipv4Address {
+    pub const LENGTH: usize = 4;
+
     pub fn from_slice(slice: &[u8]) -> Self {
-        let mut arr = [0u8; 4];
-        arr.copy_from_slice(&slice[..4]);
-        Ipv4Address(arr)
+        let mut buf = [0u8; 4];
+        buf.copy_from_slice(&slice[..4]);
+        Ipv4Address(buf)
     }
 
-    pub fn to_slice(&self) -> &[u8] {
-        todo!();
+    pub fn to_slice(&self, slice: &mut [u8]) {
+        slice.copy_from_slice(&self.0);
     }
 }
 
